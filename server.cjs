@@ -40,8 +40,22 @@ const apiKeyAuth = process.env.API_KEY;
 // });
 
 // endpoint untuk ke vue client dan processing si api nya
-// endpoint untul most searched breeds
 
+// to get all breeds
+// app.get('/breed', async (req, res) => {
+//   try {
+//     const allbreed = 'https://api.thecatapi.com/v1/breeds'
+//     const response = await fetch (allbreed, { headers: { 'x-api-key': apiKeyAuth}});
+//     const data = await response.json();
+//     const breedNames = data.map(breed => ({ id: breed.id , name: breed.name}));
+//     res.json({ allBreed: breedNames });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).json({ error: 'Server error'});
+//   }
+// });
+
+// endpoint untul most searched breeds
 app.get('/breed/most-searched-breeds', async (req, res) => {
   try {
     const response = await fetch(mostBreed, {
@@ -58,90 +72,92 @@ app.get('/breed/most-searched-breeds', async (req, res) => {
 
 
 // Endpoint to show top 10 searched cats breeds
-app.get('/api/top-searched-breeds', async (req, res) => {
+// app.get('/breed/top-ten-breeds', async (req, res) => {
+//   try {
+//     const topBreedsUrl = 'https://api.thecatapi.com/v1/breeds?limit=10';
+//     const response = await fetch(topBreedsUrl);
+
+//     const data = await response.json();
+//     const topTen = data.map(breed => ({
+//       name: breed.name,
+//       description: breed.description,
+//       image: breed.image && breed.image.url
+//     }));
+//     res.json({ topTen });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// });
+
+app.get('/breed/top-ten-breeds', async (req, res) => {
   try {
-    const response = await axios.get(`${top10BreedsUrl}`);
-    const breeds = response.data.map((breed) => breed.name);
-    const imageData = response.data;
+    // const topBreedsUrl = 'https://api.thecatapi.com/v1/breeds?limit=10';
+    const topBreedsUrl = 'https://api.thecatapi.com/v1/breeds?order=desc&sort_by=total_searches&limit=10';
+    const response = await fetch(topBreedsUrl);
+    const data = await response.json();
 
-    // convert image data to Base64 encoding
-    const base64Image = Buffer.from(imageData, 'binary').toString('base64');
-    const dataURI = `data:image/jpeg;base64,${base64Image}`;
+    const topTen = [];
 
-    res.send(dataURI);
-    res.json(breeds);
+    for (let i = 0; i < data.length; i++) {
+      const breed = data[i];
+      const breedUrl = `https://api.thecatapi.com/v1/images/search?breed_ids=${breed.id}`;
+      const breedResponse = await fetch(breedUrl);
+      const breedData = await breedResponse.json();
+
+      const name = breed.name;
+      const description = breed.description;
+      const imageUrl = breedData[0].url;
+
+      topTen.push({ name, description, imageUrl });
+    }
+
+    console.log(topTen);
+
+    res.json({ topTen });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Error fetching top 10 breeds' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
 
-// Endpoint to show cat breed that for searchable
 
+
+
+// Endpoint to show cat breed that for searchable
 
 app.get('/breed/:breedName', async (req, res) => {
   try {
     const { breedName } = req.params;
-    // const url = `https://api.thecatapi.com/v1/breeds`;
     const url = `${allBreedsUrl}`;
-    // const response = await axios.get(url);
     const response = await fetch(url, { headers: { 'x-api-key': apiKeyAuth } });
-    const filteredBreeds = response.data.filter(breed => breed.name.toLowerCase().includes(decodeURIComponent(breedName).toLowerCase()));
-    // console.log(filteredBreeds);
-    
-    // Fetch the image data for each breed
+    const breeds = await response.json();
+
+    // Filter the breeds by name
+    const filteredBreeds = breeds.filter(breed => breed.name.toLowerCase().includes(decodeURIComponent(breedName).toLowerCase()));
+
+
+    // Retrieve the image data for each breed
     const breedDataPromises = filteredBreeds.map(async breed => {
-      const imageDataResponse = await axios.get(`https://api.thecatapi.com/v1/images/${breed.reference_image_id}`);
-      const imageData = imageDataResponse.data;
+      const imageDataResponse = await fetch(`https://api.thecatapi.com/v1/images/${breed.reference_image_id}`, { headers: { 'x-api-key': apiKeyAuth } });
+      const imageData = await imageDataResponse.json();
       console.log(`Breed ${breed.name} image data:`, imageData);
       return { ...breed, imageData };
     });
     const breedData = await Promise.all(breedDataPromises);
-    console.log('Breed data with image data:', breedData);
 
     if (breedData.length > 0) {
       res.status(200).json(breedData);
     } else {
       res.status(404).send(`Breed ${breedName} not found`);
     }
-        // if (filteredBreeds.length > 0) {
-        //   res.status(200).json(filteredBreeds);
-        // } else {
-        //   res.status(404).send(`Breed ${breedName} not found`);
-        // }
-        if (breedData.length > 0) {
-          res.status(200).json(breedData);
-        } else {
-          res.status(404).send(`Breed ${breedName} not found`);
-        }
   } catch (error) {
-        console.error(error);
-        res.status(500).send('Internal server error');
-    }
+    console.error(error);
+    res.status(500).send('Internal server error');
+  }
 });
 
-
-
-
-
-// Endpoint to show all breeds detail
-// app.get('/api/all-breeds', async (req, res) => {
-//   try {
-//     const response = await axios.get(`${allBreedsUrl}`);
-//     const imageData = response.data;
-
-//     // convert image data to Base64 encoding
-//     const base64Image = Buffer.from(imageData, 'binary').toString('base64');
-//     const dataURI = `data:image/jpeg;base64,${base64Image}`;
-
-//     res.send(dataURI);
-//     res.json(response.data);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: 'Error fetching all breeds' });
-//   }
-// });
 
 
 
